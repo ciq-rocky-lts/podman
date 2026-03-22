@@ -8,7 +8,7 @@ GO111MODULE=off go build -buildmode pie -compiler gc -tags="rpm_crashtraceback $
 
 %global import_path github.com/containers/podman
 %global branch v4.9-rhel
-%global commit0 0e11f820f48e52ab129fcb42ba8e137b7ce4816c
+%global commit0 702415d8fcdb82cb405ffff57b7b937988582ef1
 %global shortcommit0 %(c=%{commit0}; echo ${c:0:7})
 %global cataver 0.1.7
 %global commit_dnsname bdc4ab85266ade865a7c398336e98721e62ef6b2
@@ -20,7 +20,7 @@ GO111MODULE=off go build -buildmode pie -compiler gc -tags="rpm_crashtraceback $
 Epoch: 4
 Name: podman
 Version: 4.9.4
-Release: 20%{?dist}
+Release: 28%{?dist}
 Summary: Manage Pods, Containers and Container Images
 License: Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND ISC AND MIT AND MPL-2.0
 URL: https://%{name}.io/
@@ -423,6 +423,50 @@ fi
 %{_libexecdir}/%{name}/gvproxy
 
 %changelog
+* Mon Feb 02 2026 Jindrich Novy <jnovy@redhat.com> - 4:4.9.4-28
+- rebuild
+- Resolves: RHEL-140532
+
+* Wed Jan 14 2026 Jindrich Novy <jnovy@redhat.com> - 4:4.9.4-27
+- update to the latest content of https://github.com/containers/podman/tree/v4.9-rhel
+  (https://github.com/containers/podman/commit/702415d)
+- fixes "CVE-2025-47913 container-tools:rhel8/podman: golang.org/x/crypto/ssh/agent: SSH client panic due to unexpected SSH_AGENT_SUCCESS [rhel-8.10.z]"
+- Resolves: RHEL-130976
+
+* Fri Dec 19 2025 Jindrich Novy <jnovy@redhat.com> - 4:4.9.4-26
+- update to the latest content of https://github.com/containers/podman/tree/v4.9-rhel
+  (https://github.com/containers/podman/commit/837a65c)
+- fixes "do not pass volume options as bind mounts options to runtime"
+- Resolves: RHEL-132859
+
+* Mon Dec 15 2025 Jindrich Novy <jnovy@redhat.com> - 4:4.9.4-25
+- update to the latest content of https://github.com/containers/podman/tree/v4.9-rhel
+  (https://github.com/containers/podman/commit/638f1d2)
+- fixes "[Minor Incident] CVE-2025-52881 container-tools:rhel8/podman: container escape and denial of service due to arbitrary write gadgets and procfs write redirects [rhel-8.10.z]"
+- Resolves: RHEL-126904
+
+* Wed Dec 03 2025 Jindrich Novy <jnovy@redhat.com> - 4:4.9.4-24
+- rebuild for CVE-2025-58183
+- Resolves: RHEL-125654
+
+* Thu Sep 11 2025 Jindrich Novy <jnovy@redhat.com> - 4:4.9.4-23
+- update to the latest content of https://github.com/containers/podman/tree/v4.9-rhel
+  (https://github.com/containers/podman/commit/ff15af1)
+- fixes "CVE-2025-9566 container-tools:rhel8/podman: Podman kube play command may overwrite host files [rhel-8.10.z]"
+- Resolves: RHEL-113145
+
+* Wed Jun 25 2025 Jindrich Novy <jnovy@redhat.com> - 4:4.9.4-22
+- update to the latest content of https://github.com/containers/podman/tree/v4.9-rhel
+  (https://github.com/containers/podman/commit/6cc8283)
+- fixes "CVE-2025-6032 container-tools:rhel8/podman: podman missing TLS verification [rhel-8.10.z]"
+- Resolves: RHEL-96702
+
+* Tue Jun 24 2025 Jindrich Novy <jnovy@redhat.com> - 4:4.9.4-21
+- update to the latest content of https://github.com/containers/podman/tree/v4.9-rhel
+  (https://github.com/containers/podman/commit/97e91b5)
+- fixes "Terminate healthcheck command upon reaching timeout. [rhel-8.10.z]"
+- Resolves: RHEL-96914
+
 * Mon Mar 17 2025 Jindrich Novy <jnovy@redhat.com> - 4:4.9.4-20
 - update to the latest content of https://github.com/containers/podman/tree/v4.9-rhel
   (https://github.com/containers/podman/commit/0e11f82)
