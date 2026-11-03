@@ -8,7 +8,7 @@ GO111MODULE=off go build -buildmode pie -compiler gc -tags="rpm_crashtraceback $
 
 %global import_path github.com/containers/podman
 %global branch v4.9-rhel
-%global commit0 702415d8fcdb82cb405ffff57b7b937988582ef1
+%global commit0 74407364841798d8b5b11ff45eaf83171dbcf82c
 %global shortcommit0 %(c=%{commit0}; echo ${c:0:7})
 %global cataver 0.1.7
 %global commit_dnsname bdc4ab85266ade865a7c398336e98721e62ef6b2
@@ -20,15 +20,11 @@ GO111MODULE=off go build -buildmode pie -compiler gc -tags="rpm_crashtraceback $
 Epoch: 4
 Name: podman
 Version: 4.9.4
-Release: 28%{?dist}
+Release: 38%{?dist}
 Summary: Manage Pods, Containers and Container Images
 License: Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND ISC AND MIT AND MPL-2.0
 URL: https://%{name}.io/
-%if 0%{?branch:1}
-Source0: https://%{import_path}/tarball/%{commit0}/%{branch}-%{shortcommit0}.tar.gz
-%else
-Source0: https://%{import_path}/archive/%{commit0}/%{name}-%{version}-%{shortcommit0}.tar.gz
-%endif
+Source0: https://gitlab.cee.redhat.com/sustaining-engineering/container-tools/src-git/%{name}/-/archive/%{commit0}/%{branch}-%{shortcommit0}.tar.gz
 Source1: https://github.com/openSUSE/catatonit/archive/v%{cataver}.tar.gz
 #Source2: https://github.com/containers/dnsname/archive/v%%{dnsnamever}.tar.gz
 Source2: https://github.com/containers/dnsname/archive/%{commit_dnsname}/dnsname-%{shortcommit_dnsname}.tar.gz
@@ -175,11 +171,7 @@ gvisor-tap-vsock brings a configurable DNS server and
 dynamic port forwarding.
 
 %prep
-%if 0%{?branch:1}
-%autosetup -Sgit -n containers-%{name}-%{shortcommit0}
-%else
 %autosetup -Sgit -n %{name}-%{commit0}
-%endif
 sed -i 's;@@PODMAN@@\;$(BINDIR);@@PODMAN@@\;%{_bindir};' Makefile
 sed -i 's,-Werror,,' pkg/rootless/rootless_linux.go
 tar fx %{SOURCE1}
@@ -423,6 +415,46 @@ fi
 %{_libexecdir}/%{name}/gvproxy
 
 %changelog
+* Thu Oct 22 2026 Jindrich Novy <jnovy@redhat.com> - 4:4.9.4-38
+- Rebuild for CVE-2026-78667 and CVE-2026-111943
+- Resolves: RHEL-278827 RHEL-287448
+
+* Tue Sep 01 2026 Jindrich Novy <jnovy@redhat.com> - 4:4.9.4-37
+- rebuild with updated Go to fix CVE-2026-42499
+- Resolves: RHEL-241487 RHEL-241854 RHEL-241997 RHEL-242053 RHEL-242188 RHEL-242289 RHEL-251853
+
+* Thu Aug 20 2026 Jindrich Novy <jnovy@redhat.com> - 4:4.9.4-36
+- rebuild with Go 1.25.11 to fix CVE-2026-33818, CVE-2026-56853, CVE-2026-56858,
+  CVE-2026-56859, CVE-2026-56860, CVE-2026-56862
+
+* Tue Jul 21 2026 Jindrich Novy <jnovy@redhat.com> - 4:4.9.4-35
+- update to the latest content of v4.9-rhel (commit 7440736) - fix podman commit
+  nil pointer dereference when ImportBuilder fails - Resolves: RHEL-166084
+
+* Wed Jul 08 2026 Jindrich Novy <jnovy@redhat.com> - 4:4.9.4-33
+- update to the latest content of v4.9-rhel (commit bd39e82) to fix CVE-2026-39835, CVE-2026-57231, CVE-2026-25681, CVE-2026-27136
+- Resolves: RHEL-190070 RHEL-190856 RHEL-191102 RHEL-191553
+
+* Wed Jul 01 2026 Jindrich Novy <jnovy@redhat.com> - 4:4.9.4-32
+- switch source URL from GitHub to the internal GitLab sustaining-engineering repo
+- update to the latest content of v4.9-rhel (commit 48ede9e)
+- bump golang.org/x/crypto to v0.53.0 to fix CVE-2026-39829, CVE-2026-39830, CVE-2026-39832, CVE-2026-42508
+
+* Tue May 19 2026 Jindrich Novy <jnovy@redhat.com> - 4:4.9.4-31
+- update to the latest content of https://github.com/containers/podman/tree/v4.9-rhel
+  (https://github.com/containers/podman/commit/11de97d)
+- Resolves: RHEL-173978
+
+* Wed Mar 11 2026 Jindrich Novy <jnovy@redhat.com> - 4:4.9.4-30
+- update to the latest content of https://github.com/containers/podman/tree/v4.9-rhel
+  (https://github.com/containers/podman/commit/79517c7)
+- fixes "When using a volume mount that is RO in podman it throws error because runc automatically appends RW to it which throws an error [rhel-8.10.z]"
+- Resolves: RHEL-152630
+
+* Tue Feb 17 2026 Jindrich Novy <jnovy@redhat.com> - 4:4.9.4-29
+- rebuild for CVE-2025-68121
+- Resolves: RHEL-149265
+
 * Mon Feb 02 2026 Jindrich Novy <jnovy@redhat.com> - 4:4.9.4-28
 - rebuild
 - Resolves: RHEL-140532
