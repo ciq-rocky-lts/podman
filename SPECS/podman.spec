@@ -4,28 +4,42 @@
 GO111MODULE=off go build -buildmode pie -compiler gc -tags="rpm_crashtraceback ${BUILDTAGS:-}" -ldflags "${LDFLAGS:-} -linkmode=external -compressdwarf=false -B 0x$(head -c20 /dev/urandom|od -An -tx1|tr -d ' \\n') -extldflags '%__global_ldflags'" -a -v %{?**};
 
 %global import_path github.com/containers/podman
-#%%global branch v5.6-rhel
-%global commit0 66780e9b8968785823008e866f9bb84d20c5f691
+%global branch v5.4-rhel
+%global commit0 b0d88c7ec22e8718084473b43357312600e5fb75
 %global shortcommit0 %(c=%{commit0}; echo ${c:0:7})
 %global cataver 0.1.7
 %global commit_dnsname bdc4ab85266ade865a7c398336e98721e62ef6b2
 %global shortcommit_dnsname %(c=%{commit_dnsname}; echo ${c:0:7})
 
-Epoch: 6
+Epoch: 5
 Name: podman
-Version: 5.8.2
-Release: 8%{?dist}
+Version: 5.4.0
+Release: 13.1%{?dist}
 Summary: Manage Pods, Containers and Container Images
 License: Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND ISC AND MIT AND MPL-2.0
 URL: https://%{name}.io/
 %if 0%{?branch:1}
 Source0: https://%{import_path}/tarball/%{commit0}/%{branch}-%{shortcommit0}.tar.gz
 %else
-Source0: https://gitlab.cee.redhat.com/sustaining-engineering/container-tools/src-git/%{name}/-/archive/%{commit0}/%{name}-%{commit0}.tar.gz
+Source0: https://%{import_path}/archive/%{commit0}/%{name}-%{version}-%{shortcommit0}.tar.gz
 %endif
 Source1: https://github.com/openSUSE/catatonit/archive/v%{cataver}.tar.gz
 #Source2: https://github.com/containers/dnsname/archive/v%%{dnsnamever}.tar.gz
 Source2: https://github.com/containers/dnsname/archive/%{commit_dnsname}/dnsname-%{shortcommit_dnsname}.tar.gz
+# CVE-2026-46597 - adapted from the golang.org/x/crypto fix abbc44d451a6f9236a2bbd26cbcd4d0fec473da3
+# ("ssh: fix incorrect operator order", Fixes CVE-2026-46597):
+# https://github.com/golang/crypto/commit/abbc44d451a6f9236a2bbd26cbcd4d0fec473da3.patch
+# (adapted: the diff-header path ssh/cipher.go is re-rooted to podman's vendored
+# vendor/golang.org/x/crypto/ssh/cipher.go; hunk body and context are the upstream ones)
+Patch1: podman-5.4.0-CVE-2026-46597.patch
+# CVE-2026-39831
+Patch2: podman-5.4.0-CVE-2026-39831.patch
+# CVE-2026-116591 — upstream backport
+Patch3: podman-5.4.0-CVE-2026-116591.patch
+# CVE-2025-47913 — upstream backport
+Patch4: podman-5.4.0-CVE-2025-47913.patch
+# CVE-2025-52881 — upstream backport
+Patch5: podman-5.4.0-CVE-2025-52881.patch
 # https://fedoraproject.org/wiki/PackagingDrafts/Go#Go_Language_Architectures
 ExclusiveArch: %{go_arches}
 Provides: %{name}-manpages = %{epoch}:%{version}-%{release}
@@ -43,7 +57,7 @@ BuildRequires: libassuan-devel
 BuildRequires: libgpg-error-devel
 BuildRequires: libseccomp-devel
 BuildRequires: libselinux-devel
-BuildRequires: sqlite-devel
+BuildRequires: ostree-devel
 BuildRequires: pkgconfig
 BuildRequires: make
 BuildRequires: systemd
@@ -127,8 +141,7 @@ file.  Each CNI network will have its own dnsmasq instance.
 %package tests
 Summary: Tests for %{name}
 Requires: %{name} = %{epoch}:%{version}-%{release}
-# Fetch bats rpm if you can, else install any way available
-Recommends: bats
+#Requires: bats  (which RHEL8 doesn't have. If it ever does, un-comment this)
 Requires: nmap-ncat
 Requires: httpd-tools
 Requires: jq
@@ -138,13 +151,11 @@ Requires: openssl
 Requires: buildah
 Requires: gnupg
 Requires: git-daemon
-Recommends: slirp4netns
 
 %description tests
 %{summary}
 
-This package contains system tests for %{name}. Only intended to be used for
-gating tests. Not supported for end users / customers.
+This package contains system tests for %{name}
 
 %prep
 %if 0%{?branch:1}
@@ -212,22 +223,18 @@ LDFLAGS="-X %{import_path}/libpod/define.buildInfo=$(date +%s)"
 # build rootlessport
 %gobuild -o bin/rootlessport %{import_path}/cmd/rootlessport
 
-export BASEBUILDTAGS="cni seccomp $(hack/systemd_tag.sh) $(hack/libsubid_tag.sh) libsqlite3 grpcnotrace"
-
-export BUILDTAGS="$BASEBUILDTAGS $(hack/btrfs_installed_tag.sh)"
+export BUILDTAGS="cni seccomp btrfs_noversion exclude_graphdriver_devicemapper exclude_graphdriver_btrfs $(hack/libdm_tag.sh) $(hack/selinux_tag.sh) $(hack/systemd_tag.sh) $(hack/libsubid_tag.sh)"
 %gobuild -o bin/%{name} %{import_path}/cmd/%{name}
 
+# build %%{name}-testing
+%gobuild -o bin/podman-testing %{import_path}/cmd/podman-testing
+
 # build %%{name}-remote
-export BUILDTAGS="$BASEBUILDTAGS exclude_graphdriver_btrfs remote"
+export BUILDTAGS="remote $BUILDTAGS"
 %gobuild -o bin/%{name}-remote %{import_path}/cmd/%{name}
 
 # build quadlet
-export BUILDTAGS="$BASEBUILDTAGS $(hack/btrfs_installed_tag.sh)"
 %gobuild -o bin/quadlet %{import_path}/cmd/quadlet
-
-# build %%{name}-testing
-export BUILDTAGS="$BASEBUILDTAGS $(hack/btrfs_installed_tag.sh)"
-%gobuild -o bin/podman-testing %{import_path}/cmd/podman-testing
 
 %{__make} docs
 %{__make} docker-docs
@@ -377,134 +384,79 @@ fi
 %{_datadir}/%{name}/test
 
 %changelog
-* Sat Oct 24 2026 Jindrich Novy <jnovy@redhat.com> - 6:5.8.2-8
-- Rebuild for CVE-2026-78667 and CVE-2026-111943
-- Resolves: RHEL-279015
-- Resolves: RHEL-287513
+* Tue Nov 17 2026 pmp <packager@ciq.com> - 5:5.4.0-13.1
+- Fix CVE-2026-46597
+- Fix CVE-2026-39831
+- Fix CVE-2026-116591
+- Fix CVE-2025-47913
+- Fix CVE-2025-52881
 
-* Tue Sep 15 2026 Jindrich Novy <jnovy@redhat.com> - 6:5.8.2-7
-- update to the latest upstream commit 66780e9b
-- rebuild with golang-1.26.7 fixing CVE-2026-33818 CVE-2026-56860
-  CVE-2026-56859 CVE-2026-56858 CVE-2026-56862 CVE-2026-56853
-  CVE-2026-19730 CVE-2026-39830 CVE-2026-17106
-- Resolves: RHEL-241579
-- Resolves: RHEL-241720
-- Resolves: RHEL-241983
-- Resolves: RHEL-242126
-- Resolves: RHEL-242282
-- Resolves: RHEL-240089
-- Resolves: RHEL-186270
-- Resolves: RHEL-241172
-- Resolves: RHEL-252466
+* Wed Sep 10 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.4.0-13
+- update to the latest content of https://github.com/containers/podman/tree/v5.4-rhel
+  (https://github.com/containers/podman/commit/b0d88c7)
+- fixes "CVE-2025-9566 podman: Podman kube play command may overwrite host files [rhel-9.6.z]"
+- Resolves: RHEL-113152
 
-* Sat Aug 15 2026 Jindrich Novy <jnovy@redhat.com> - 6:5.8.2-6
-- vendor in mirror fallback for container image pulls - Resolves: RHEL-242409
+* Wed Jun 25 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.4.0-12
+- update to the latest content of https://github.com/containers/podman/tree/v5.4-rhel
+  (https://github.com/containers/podman/commit/9811294)
+- fixes "CVE-2025-6032 podman: podman missing TLS verification [rhel-9.6.z]"
+- Resolves: RHEL-96708
 
-* Fri Jul 10 2026 Jindrich Novy <jnovy@redhat.com> - 6:5.8.2-5
-- rebuild for CVE-2026-39822
-- Resolves: RHEL-193646
+* Tue Jun 24 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.4.0-11
+- update to the latest content of https://github.com/containers/podman/tree/v5.4-rhel
+  (https://github.com/containers/podman/commit/f944b21)
+- fixes "Terminate healthcheck command upon reaching timeout. [rhel-9.6.z]"
+- Resolves: RHEL-96917
 
-* Wed Jul 08 2026 Jindrich Novy <jnovy@redhat.com> - 6:5.8.2-4
-- bump to upstream commit a476c2b2 fixing CVE-2026-39835 CVE-2026-39829
-  CVE-2026-39832 CVE-2026-42508 CVE-2026-27136 CVE-2026-25681 CVE-2026-57231 and
-  podman-remote save regression
+* Wed Jun 04 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.4.0-10
+- rebuild to fix CVE-2025-22871 podman: Request smuggling due to acceptance of invalid chunked data in net/http
+- Resolves: RHEL-90055
 
-* Thu May 07 2026 Jindrich Novy <jnovy@redhat.com> - 6:5.8.2-3
-- Rebuild for CVE-2026-32283
-- Resolves: RHEL-167685
-
-* Sun May 04 2026 Jindrich Novy <jnovy@redhat.com> - 6:5.8.2-2
-- Rebuild for CVE-2026-25679
-- Resolves: RHEL-158781
-
-* Thu Apr 16 2026 Jindrich Novy <jnovy@redhat.com> - 6:5.8.2-1
-- update to https://github.com/containers/podman/releases/tag/v5.8.2
-- fixes CVE-2026-34986 go-jose: Go JOSE Denial of Service via crafted JWE
-- Resolves: RHEL-165040
-
-* Wed Apr 08 2026 Jindrich Novy <jnovy@redhat.com> - 6:5.8.1-3
-- revert sequoia - only available in RHEL10
-- Related: RHEL-164019
-
-* Wed Apr 08 2026 Jindrich Novy <jnovy@redhat.com> - 6:5.8.1-2
-- enable sequoia
-- Resolves: RHEL-164019
-
-* Mon Mar 30 2026 Jindrich Novy <jnovy@redhat.com> - 6:5.8.1-1
-- update to https://github.com/containers/podman/releases/tag/v5.8.1
-- fixes podman restart policy `unless-stopped` does not behave exactly as `always` despite the man page saying they are identical - [RHEL-9.8] [0day]
-- Resolves: RHEL-157746
-
-* Thu Feb 19 2026 Jindrich Novy <jnovy@redhat.com> - 6:5.8.0-1
-- update to https://github.com/containers/podman/releases/tag/v5.8.0
-- Related: RHEL-111919
-
-* Thu Jan 29 2026 Jindrich Novy <jnovy@redhat.com> - 6:5.6.0-3
-- update to rhel-9.7.z version of podman
-- Resolves: RHEL-142896
-
-* Fri Aug 22 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.6.0-2
-- update to the latest content of https://github.com/containers/podman/tree/v5.6-rhel
-  (https://github.com/containers/podman/commit/56f1962)
-- fixes "Work on RHEL 9.7 packaging"
-- Related: RHEL-80816
-
-* Wed Aug 20 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.6.1-0.1
-- update to the latest content of https://github.com/containers/podman/tree/v5.6
-  (https://github.com/containers/podman/commit/d46b857)
-- fixes "Work on RHEL 9.7 packaging"
-- Related: RHEL-80816
-
-* Mon Aug 18 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.6.0-1
-- update to https://github.com/containers/podman/releases/tag/v5.6.0
-- Related: RHEL-80816
-
-* Thu Jul 03 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.5.2-1
-- update to https://github.com/containers/podman/releases/tag/v5.5.2
-- Related: RHEL-80816
-
-* Tue Jun 10 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.5.1-1
-- update to https://github.com/containers/podman/releases/tag/v5.5.1
-- Related: RHEL-80816
-
-* Thu May 08 2025 Lokesh Mandvekar <lsm5@redhat.com> - 5:5.4.0-8
-- Enable gating tests via TMT
-- Related: RHEL-80816
-
-* Fri Apr 25 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.4.0-7
+* Wed Apr 09 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.4.0-9
 - update to the latest content of https://github.com/containers/podman/tree/v5.4-rhel
   (https://github.com/containers/podman/commit/0ee1d49)
-- fixes "podman tests are failing - [RHEL-10.1.GA]"
-- Resolves: RHEL-88191
+- fixes "Rootless container libpod/tmp/persist directories not cleaned up, fill up tmpfs - [RHEL 9.6] 0day"
+- Resolves: RHEL-86544
 
-* Mon Apr 07 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.4.0-6
+* Mon Apr 07 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.4.0-8
 - update to the latest content of https://github.com/containers/podman/tree/v5.4-rhel
   (https://github.com/containers/podman/commit/a994a04)
-- fixes "podman tests are failing"
-- Resolves: RHEL-86200
+- fixes "podman tests are failing - [RHEL 9.6] 0day"
+- Resolves: RHEL-86092
 
-* Tue Mar 18 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.4.0-5
+* Mon Mar 31 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.4.0-7
+- update to the latest content of https://github.com/containers/podman/tree/v5.4-rhel
+  (https://github.com/containers/podman/commit/f7bf65c)
+- fixes "Importing a tar.xz archive as a container fails with error 'layer 0 <...> does not match config's DiffID'  - [RHEL 9.6] 0day"
+- Resolves: RHEL-85218
+
+* Tue Mar 18 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.4.0-6
 - update to the latest content of https://github.com/containers/podman/tree/v5.4-rhel
   (https://github.com/containers/podman/commit/9ad4842)
-- fixes "Work on RHEL 9.7 packaging"
-- Related: RHEL-80816
+- fixes "CVE-2025-22869 podman: Potential denial of service in golang.org/x/crypto [rhel-9.6]"
+- Resolves: RHEL-81319
 
-* Fri Mar 14 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.4.0-4
+* Fri Mar 14 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.4.0-5
 - update to the latest content of https://github.com/containers/podman/tree/v5.4-rhel
   (https://github.com/containers/podman/commit/9d2e54f)
-- fixes "Excessive memory leak due to uncontrolled accumulation of health.log entries in Podman 5.x"
-- Resolves: RHEL-83262
+- fixes "Excessive memory leak due to uncontrolled accumulation of health.log entries in Podman 5.x - [RHEL - 9.6] ZeroDay"
+- Resolves: RHEL-83557
 
-* Thu Mar 13 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.4.0-3
+* Wed Mar 12 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.4.0-4
 - update to the latest content of https://github.com/containers/podman/tree/v5.4-rhel
   (https://github.com/containers/podman/commit/45c2d1f)
-- fixes "CVE-2025-27144 podman: Go JOSE's Parsing Vulnerable to Denial of Service [rhel-9.7]"
-- Resolves: RHEL-80615
+- Resolves: RHEL-82970
 
-* Fri Mar 07 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.4.0-2
+* Tue Mar 11 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.4.0-3
 - update to the latest content of https://github.com/containers/podman/tree/v5.4-rhel
-  (https://github.com/containers/podman/commit/5e3accd)
-- Related: RHEL-80816
+  (https://github.com/containers/podman/commit/e48006b)
+- Resolves: RHEL-82198
+
+* Thu Mar 06 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.4.0-2
+- update to the latest content of https://github.com/containers/podman/tree/v5.4-rhel
+  (https://github.com/containers/podman/commit/2adbe89)
+- Resolves: RHEL-79694
 
 * Wed Feb 12 2025 Jindrich Novy <jnovy@redhat.com> - 5:5.4.0-1
 - update to https://github.com/containers/podman/releases/tag/v5.4.0
