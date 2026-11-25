@@ -14,7 +14,7 @@ GO111MODULE=off go build -buildmode pie -compiler gc -tags="rpm_crashtraceback $
 Epoch: 5
 Name: podman
 Version: 5.4.0
-Release: 13.1%{?dist}
+Release: 13.2%{?dist}
 Summary: Manage Pods, Containers and Container Images
 License: Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND ISC AND MIT AND MPL-2.0
 URL: https://%{name}.io/
@@ -40,6 +40,8 @@ Patch3: podman-5.4.0-CVE-2026-116591.patch
 Patch4: podman-5.4.0-CVE-2025-47913.patch
 # CVE-2025-52881 — upstream backport
 Patch5: podman-5.4.0-CVE-2025-52881.patch
+# CVE-2026-42508
+Patch6: podman-5.4.0-CVE-2026-42508.patch
 # https://fedoraproject.org/wiki/PackagingDrafts/Go#Go_Language_Architectures
 ExclusiveArch: %{go_arches}
 Provides: %{name}-manpages = %{epoch}:%{version}-%{release}
@@ -384,6 +386,9 @@ fi
 %{_datadir}/%{name}/test
 
 %changelog
+* Thu Nov 19 2026 pmp <packager@ciq.com> - 5:5.4.0-13.2
+- Fix CVE-2026-42508
+
 * Tue Nov 17 2026 pmp <packager@ciq.com> - 5:5.4.0-13.1
 - Fix CVE-2026-46597
 - Fix CVE-2026-39831
